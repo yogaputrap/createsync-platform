@@ -1,9 +1,8 @@
-// Nama file: frontend/src/pages/SignUpPage.jsx
 import React, { useState } from 'react';
 import { 
   Container, Paper, Typography, TextField, 
   Button, Box, Alert, InputAdornment, IconButton,
-  CssBaseline, Avatar, Stack, Divider, Grid
+  CssBaseline, Avatar, Stack, Divider
 } from '@mui/material';
 import { 
   Visibility, 
@@ -17,42 +16,81 @@ import axios from 'axios';
 function SignUpPage() {
   const navigate = useNavigate();
   
-  // Form State
+  // 1. SINKRONISASI STATE: Gunakan 'fullName' (sesuai req.body di backend)
   const [formData, setFormData] = useState({
-    full_name: '',
+    fullName: '',
     email: '',
     password: ''
   });
   
-  // UI State
   const [message, setMessage] = useState({ text: '', type: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const onChange = (e) => {
+    if (message.text) setMessage({ text: '', type: '' });
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const validateForm = () => {
+    const { fullName, email, password } = formData;
+    
+    // Validasi Trim: Memastikan tidak hanya berisi spasi
+    if (!fullName.trim() || !email.trim() || !password.trim()) {
+      setMessage({ text: 'Harap isi semua kolom!', type: 'error' });
+      return false;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      setMessage({ text: 'Format email tidak valid!', type: 'error' });
+      return false;
+    }
+
+    if (password.length < 6) {
+      setMessage({ text: 'Kata sandi minimal 6 karakter!', type: 'error' });
+      return false;
+    }
+
+    return true;
   };
 
   const onSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!validateForm()) return;
+
     setLoading(true);
     setMessage({ text: '', type: '' });
 
     try {
-      // Endpoint pendaftaran (sesuaikan dengan backend Anda)
-      await axios.post('http://localhost:3001/api/auth/register', formData);
-      
-      setMessage({ text: 'Akun berhasil dibuat! Mengalihkan ke Login...', type: 'success' });
+      // 2. SANITISASI DATA: Mengirim data yang sudah di-trim
+      const submitData = {
+        fullName: formData.fullName.trim(),
+        email: formData.email.trim(),
+        password: formData.password
+      };
 
-      setTimeout(() => {
-        navigate('/signin'); 
-      }, 2000);
+      // Pastikan URL dan port sesuai dengan backend Anda
+      const res = await axios.post('http://localhost:3001/api/auth/register', submitData);
+      
+      setMessage({ 
+        text: res.data.msg || 'Akun berhasil dibuat! Mengalihkan...', 
+        type: 'success' 
+      });
+
+      // 3. AUTO-LOGIN (Opsional): Jika backend mengirimkan token saat register
+      if (res.data.token) {
+        localStorage.setItem('token', res.data.token);
+        setTimeout(() => navigate('/home'), 1500);
+      } else {
+        setTimeout(() => navigate('/signin'), 2000);
+      }
 
     } catch (err) {
-      setMessage({ 
-        text: err.response?.data?.msg || 'Gagal membuat akun. Silakan coba lagi.', 
-        type: 'error' 
-      });
+      // 4. HANDLING ERROR: Menampilkan pesan spesifik dari backend
+      const errorMsg = err.response?.data?.msg || 'Gagal tersambung ke server';
+      setMessage({ text: errorMsg, type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -74,7 +112,6 @@ function SignUpPage() {
             border: '1px solid #e2e8f0'
           }}
         >
-          {/* Ikon Registrasi */}
           <Avatar sx={{ m: 1, bgcolor: 'secondary.main', width: 45, height: 45 }}>
             <RegisterIcon />
           </Avatar>
@@ -84,10 +121,9 @@ function SignUpPage() {
           </Typography>
           
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2, textAlign: 'center' }}>
-            Bergabung dengan komunitas <b>CreateSync</b> hari ini
+            Bergabung dengan komunitas <b>CreateSync</b>
           </Typography>
 
-          {/* Alert untuk Pesan */}
           {message.text && (
             <Alert severity={message.type} sx={{ width: '100%', mb: 2, borderRadius: 2 }}>
               {message.text}
@@ -99,11 +135,11 @@ function SignUpPage() {
               margin="dense"
               required
               fullWidth
-              id="full_name"
+              id="fullName"
               label="Nama Lengkap"
-              name="full_name"
+              name="fullName" // Harus SAMA dengan kunci di state dan backend
               autoFocus
-              value={formData.full_name}
+              value={formData.fullName}
               onChange={onChange}
               sx={{ mb: 1 }}
             />
@@ -126,7 +162,7 @@ function SignUpPage() {
               required
               fullWidth
               name="password"
-              label="Kata Sandi"
+              label="Kata Sandi (Min. 6 Karakter)"
               type={showPassword ? 'text' : 'password'}
               id="password"
               value={formData.password}
@@ -153,13 +189,9 @@ function SignUpPage() {
               size="large"
               disabled={loading}
               sx={{ 
-                mt: 3, 
-                mb: 2, 
-                py: 1.2, 
-                fontWeight: 'bold', 
-                textTransform: 'none', 
-                borderRadius: 2,
-                fontSize: '1rem' 
+                mt: 3, mb: 2, py: 1.2, 
+                fontWeight: 'bold', textTransform: 'none', 
+                borderRadius: 2, fontSize: '1rem' 
               }}
             >
               {loading ? 'Mendaftarkan...' : 'Buat Akun'}
